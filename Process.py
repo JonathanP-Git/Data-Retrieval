@@ -86,18 +86,21 @@ class Process:
         return Q
 
     def get_candidate_documents_and_scores(self, query_to_search, index, words, pls):
-        candidates = {}
-        N = len(index.DL)
-        for term in np.unique(query_to_search):
-            if term in index.df.keys():
-                list_of_doc = pls[words.index(term)]
-                for doc_id, freq in list_of_doc:
-                    normlized_tfidf = [(doc_id, (freq / index.DL[(doc_id)]) * math.log(N / index.df[term], 10)) for
-                                       doc_id, freq in list_of_doc]
-                for doc_id, tfidf in normlized_tfidf:
-                    candidates[(doc_id, term)] = candidates.get((doc_id, term), 0) + tfidf
 
-        return candidates
+        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,
+                                                                    pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
+        unique_candidates = np.unique([doc_id for doc_id, freq in candidates_scores.keys()])
+        D = np.zeros((len(unique_candidates), len(query_to_search)))
+        D = pd.DataFrame(D)
+
+        D.index = unique_candidates
+        D.columns = query_to_search
+        t_start = time()
+        for key in candidates_scores:
+            tfidf = candidates_scores[key]
+            doc_id, term = key
+            D.loc[doc_id][term] = tfidf
+        return D
 
     def generate_document_tfidf_matrix(self, query_to_search, index, words, pls):
         # total_vocab_size = len(index.term_total)
