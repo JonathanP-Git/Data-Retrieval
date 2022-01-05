@@ -59,11 +59,16 @@ class Process:
 
     def __init__(self):
 
-        file = open('./index_text.pkl','rb')
-        self.index = pickle.load(file)
-        file.close()
-        file = open('./dl.pckl','rb')
-        self.index.DL = pickle.load(file)
+        index_file = open('./index_text.pkl','rb')
+        self.index = pickle.load(index_file)
+        DL_file = open('./dl.pckl','rb')
+        self.index.DL = pickle.load(DL_file)
+        pr_file = open('./page_rank_dict.pckl','rb')
+        self.page_rank = pickle.load(pr_file)
+        DL_file.close()
+        index_file.close()
+        pr_file.close()
+
 
 
     def generate_query_tfidf_vector(self, query_to_search, index, words):
@@ -86,26 +91,23 @@ class Process:
         return Q
 
     def get_candidate_documents_and_scores(self, query_to_search, index, words, pls):
+        candidates = {}
+        N = len(self.index.DL)
+        for term in np.unique(query_to_search):
+            if term in words:
+                list_of_doc = pls[words.index(term)]
+                normlized_tfidf = [(doc_id, (freq / self.index.DL[str(doc_id)]) * math.log(N / index.df[term], 10)) for
+                                   doc_id, freq in list_of_doc]
 
-        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,
-                                                                    pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
-        unique_candidates = np.unique([doc_id for doc_id, freq in candidates_scores.keys()])
-        D = np.zeros((len(unique_candidates), len(query_to_search)))
-        D = pd.DataFrame(D)
+                for doc_id, tfidf in normlized_tfidf:
+                    candidates[(doc_id, term)] = candidates.get((doc_id, term), 0) + tfidf
 
-        D.index = unique_candidates
-        D.columns = query_to_search
-        t_start = time()
-        for key in candidates_scores:
-            tfidf = candidates_scores[key]
-            doc_id, term = key
-            D.loc[doc_id][term] = tfidf
-        return D
+        return candidates
 
     def generate_document_tfidf_matrix(self, query_to_search, index, words, pls):
         # total_vocab_size = len(index.term_total)
         candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,
-                                                               pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
+                                                                    pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
         unique_candidates = np.unique([doc_id for doc_id, freq in candidates_scores.keys()])
         D = np.zeros((len(unique_candidates), len(query_to_search)))
         D = pd.DataFrame(D)
