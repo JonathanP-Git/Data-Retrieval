@@ -14,12 +14,13 @@ from google.cloud import storage
 from collections import defaultdict
 from contextlib import closing
 
-
 # Let's start with a small block size of 30 bytes just to test things out.
 BLOCK_SIZE = 1999998
 
+
 class MultiFileWriter:
     """ Sequential binary writer to multiple files of up to BLOCK_SIZE each. """
+
     def __init__(self, base_dir, name, bucket_name):
         self._base_dir = Path(base_dir)
         self._name = name
@@ -30,13 +31,12 @@ class MultiFileWriter:
         self.client = storage.Client()
         self.bucket = self.client.bucket(bucket_name)
 
-
     def write(self, b):
         locs = []
         while len(b) > 0:
             pos = self._f.tell()
             remaining = BLOCK_SIZE - pos
-        # if the current file is full, close and open a new one.
+            # if the current file is full, close and open a new one.
             if remaining == 0:
                 self._f.close()
                 self.upload_to_gcp()
@@ -59,17 +59,20 @@ class MultiFileWriter:
         blob.upload_from_filename(file_name)
 
 
-
 class MultiFileReader:
     """ Sequential binary reader of multiple files of up to BLOCK_SIZE each. """
+
     def __init__(self):
         self._open_files = {}
+        self.client = storage.Client()
+        self.bucket = self.client.bucket('313371858')
 
     def read(self, locs, n_bytes):
         b = []
         for f_name, offset in locs:
             if f_name not in self._open_files:
-                self._open_files[f_name] = open(f_name, 'rb')
+                blob = self.bucket.get_blob(f'postings_gcp/{f_name}')
+                self._open_files[f_name] = blob.open('rb')
             f = self._open_files[f_name]
             f.seek(offset)
             n_read = min(n_bytes, BLOCK_SIZE - offset)
@@ -89,9 +92,9 @@ class MultiFileReader:
 from collections import defaultdict
 from contextlib import closing
 
-TUPLE_SIZE = 6       # We're going to pack the doc_id and tf values in this
-                     # many bytes.
-TF_MASK = 2 ** 16 - 1 # Masking the 16 low bits of an integer
+TUPLE_SIZE = 6  # We're going to pack the doc_id and tf values in this
+# many bytes.
+TF_MASK = 2 ** 16 - 1  # Masking the 16 low bits of an integer
 
 
 class InvertedIndex:
@@ -156,19 +159,15 @@ class InvertedIndex:
         """
         with closing(MultiFileReader()) as reader:
             for w, locs in self.posting_locs.items():
-                b = reader.read(locs[0], self.df[w] * TUPLE_SIZE)
+                b = reader.read(locs, self.df[w] * TUPLE_SIZE)
                 posting_list = []
                 for i in range(self.df[w]):
-                    doc_id = int.from_bytes(b[i*TUPLE_SIZE:i*TUPLE_SIZE+4], 'big')
-                    tf = int.from_bytes(b[i*TUPLE_SIZE+4:(i+1)*TUPLE_SIZE], 'big')
+                    doc_id = int.from_bytes(b[i * TUPLE_SIZE:i * TUPLE_SIZE + 4], 'big')
+                    tf = int.from_bytes(b[i * TUPLE_SIZE + 4:(i + 1) * TUPLE_SIZE], 'big')
                     posting_list.append((doc_id, tf))
                 yield w, posting_list
 
-
     def posting_lists_iter_query_specified(self, query_to_search):
-        """ A generator that reads one posting list from disk and yields
-            a (word:str, [(doc_id:int, tf:int), ...]) tuple.
-        """
         with closing(MultiFileReader()) as reader:
             for w in query_to_search:
                 posting_list = []
@@ -179,8 +178,7 @@ class InvertedIndex:
                         doc_id = int.from_bytes(b[i * TUPLE_SIZE:i * TUPLE_SIZE + 4], 'big')
                         tf = int.from_bytes(b[i * TUPLE_SIZE + 4:(i + 1) * TUPLE_SIZE], 'big')
                         posting_list.append((doc_id, tf))
-            yield w, posting_list
-
+                yield w, posting_list
 
     @staticmethod
     def read_index(base_dir, name):
@@ -193,7 +191,6 @@ class InvertedIndex:
         path_globals.unlink()
         for p in Path(base_dir).rglob(f'{name}_*.bin'):
             p.unlink()
-
 
     @staticmethod
     def write_a_posting_list(b_w_pl, bucket_name):
@@ -212,7 +209,6 @@ class InvertedIndex:
             writer.upload_to_gcp()
             InvertedIndex._upload_posting_locs(bucket_id, posting_locs, bucket_name)
         return bucket_id
-
 
     @staticmethod
     def _upload_posting_locs(bucket_id, posting_locs, bucket_name):
