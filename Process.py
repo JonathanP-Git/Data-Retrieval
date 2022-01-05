@@ -52,29 +52,28 @@ from InvertedIndex import InvertedIndex
 # !apt install openjdk-8-jdk-headless -qq
 
 import ast
-
 NUM_BUCKETS = 124
 RE_WORD = re.compile(r"""[\#\@\w](['\-]?\w){2,24}""", re.UNICODE)
-
 
 class Process:
 
     def __init__(self):
 
-        file = open('./index_text.pkl', 'rb')
+        file = open('./index_text.pkl','rb')
         self.index = pickle.load(file)
         file.close()
-        file = open('./dl.pckl', 'rb')
+        file = open('./dl.pckl','rb')
         self.index.DL = pickle.load(file)
 
-    def generate_query_tfidf_vector(self, query_to_search, index):
+
+    def generate_query_tfidf_vector(self, query_to_search, index, words):
         epsilon = .0000001
         # total_vocab_size = len(index.term_total)
         Q = np.zeros((len(query_to_search)))
         term_vector = query_to_search
         counter = Counter(query_to_search)
         for token in np.unique(query_to_search):
-            if token in index.term_total.keys():  # avoid terms that do not appear in the index.
+            if token in words:  # avoid terms that do not appear in the index.
                 tf = counter[token] / len(query_to_search)  # term frequency divded by the length of the query
                 df = index.df[token]
                 idf = math.log((len(index.DL)) / (df + epsilon), 10)  # smoothing
@@ -103,7 +102,7 @@ class Process:
     def generate_document_tfidf_matrix(self, query_to_search, index, words, pls):
         # total_vocab_size = len(index.term_total)
         candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,
-                                                                    pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
+                                                               pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
         unique_candidates = np.unique([doc_id for doc_id, freq in candidates_scores.keys()])
         D = np.zeros((len(unique_candidates), len(query_to_search)))
         D = pd.DataFrame(D)
@@ -126,16 +125,16 @@ class Process:
             fin[D.index[i]] = result[i]
         return fin
 
-    def get_top_n(self, sim_dict, N=3):
+    def get_top_n(self,sim_dict, N=3):
         return builtins.sorted([(doc_id, builtins.round(score, 5)) for doc_id, score in sim_dict.items()],
                                key=lambda x: x[1], reverse=True)[:N]
 
-    def get_topN_score_for_queries(self, queries_to_search, index, N=3):
+    def get_topN_score_for_queries(self,queries_to_search, index, N=3):
         fin = {}
         for query in queries_to_search.keys():
             query_words, query_pls = zip(*index.posting_lists_iter_query_specified(queries_to_search[query]))
             matrix = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls)
-            vector = self.generate_query_tfidf_vector(queries_to_search[query], index)
+            vector = self.generate_query_tfidf_vector(queries_to_search[query], index,query_words)
             cosine_dict = self.cosine_similarity(matrix, vector)
             fin[query] = self.get_top_n(cosine_dict, N)
         return fin
