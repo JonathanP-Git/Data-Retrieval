@@ -24,6 +24,8 @@ class MultiFileWriter:
         self._file_gen = (open(self._base_dir / f'{file_name}_{bucket_name}_{i:03}.bin', 'wb')
                           for i in itertools.count())
         self._f = next(self._file_gen)
+        f = open('/content/dl.pckl', 'rb')
+        self.DL = pickle.load(f)
 
     def write(self, b):
         locs = []
@@ -147,6 +149,22 @@ class InvertedIndex:
                     posting_list.append((doc_id, tf))
                 yield w, posting_list
 
+    def posting_lists_iter_query_specified(self, query_to_search):
+        """ A generator that reads one posting list from disk and yields
+            a (word:str, [(doc_id:int, tf:int), ...]) tuple.
+        """
+        with closing(MultiFileReader()) as reader:
+            for w in query_to_search:
+                posting_list = []
+                if w in self.posting_locs:
+                    locs = self.posting_locs[w]
+                    b = reader.read(locs, self.df[w] * TUPLE_SIZE)
+                    for i in range(self.df[w]):
+                        doc_id = int.from_bytes(b[i * TUPLE_SIZE:i * TUPLE_SIZE + 4], 'big')
+                        tf = int.from_bytes(b[i * TUPLE_SIZE + 4:(i + 1) * TUPLE_SIZE], 'big')
+                        posting_list.append((doc_id, tf))
+            yield w, posting_list
+
     @staticmethod
     def read_index(base_dir, name):
         with open(Path(base_dir) / f'{name}.pkl', 'rb') as f:
@@ -159,31 +177,3 @@ class InvertedIndex:
         for p in Path(base_dir).rglob(f'{name}_*.bin'):
             p.unlink()
 
-    @staticmethod
-    def write_a_posting_list(b_w_pl, file_name=''):
-        ''' Takes a (bucket_id, [(w0, posting_list_0), (w1, posting_list_1), ...])
-        and writes it out to disk as files named {bucket_id}_XXX.bin under the
-        current directory. Returns a posting locations dictionary that maps each
-        word to the list of files and offsets that contain its posting list.
-        Parameters:
-        -----------
-          b_w_pl: tuple
-            Containing a bucket id and all (word, posting list) pairs in that bucket
-            (bucket_id, [(w0, posting_list_0), (w1, posting_list_1), ...])
-        Return:
-          posting_locs: dict
-            Posting locations for each of the words written out in this bucket.
-        '''
-        posting_locs = defaultdict(list)
-        bucket, list_w_pl = b_w_pl
-
-        with closing(MultiFileWriter('.', bucket, file_name)) as writer:
-            for w, pl in list_w_pl:
-                # convert to bytes
-                b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')
-                              for doc_id, tf in pl])
-                # write to file(s)
-                locs = writer.write(b)
-                # save file locations to index
-                posting_locs[w].extend(locs)
-        return posting_locs
