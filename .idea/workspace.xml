@@ -4,8 +4,6 @@
     <list default="true" id="e8ac7a9c-1a34-49dc-86c7-e5534588fa24" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Process.py" beforeDir="false" afterPath="$PROJECT_DIR$/Process.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inverted_index_gcp.py" beforeDir="false" afterPath="$PROJECT_DIR$/inverted_index_gcp.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/search_frontend.py" beforeDir="false" afterPath="$PROJECT_DIR$/search_frontend.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

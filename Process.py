@@ -144,6 +144,12 @@ class Process:
                 with b.open("rb") as f:
                     self.id_title_dict = pickle.load(f)
 
+        blobs = client.list_blobs(bucket_name)
+        for b in blobs:
+            if b.name == 'doc_page_views.pkl':
+                with b.open("rb") as f:
+                    self.doc_page_views = pickle.load(f)
+
         self.index_body.DL = dl_body
         self.index_title.DL = dl_title
         self.index_anchor.DL = dl_anchor
@@ -177,15 +183,17 @@ class Process:
             if term in index.df:
                 list_of_doc = pls[words.index(term)]
                 for doc_id, freq in list_of_doc:
-                    candidates[(doc_id, term)] = candidates.get((doc_id, term), 0) + (
-                            (freq / index.DL[doc_id]) * math.log(N / index.df[term], 10))
+                    tfidf = ((freq / index.DL[doc_id]) * math.log(N / index.df[term], 10))
+                    if tfidf >= 0.02:
+                        candidates[(doc_id, term)] = tfidf
 
         return candidates
 
     def generate_document_tfidf_matrix(self, query_to_search, index, words, pls, Q):
         cosine_dict = {}
-        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,pls)
+        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
         unique_candidates = pd.unique([doc_id for doc_id, freq in candidates_scores.keys()])
+        norm_q = (np.linalg.norm(Q))
         queries_amount = len(query_to_search)
         for doc_id in unique_candidates:
             single_tfidf_list = np.zeros(queries_amount)
@@ -194,13 +202,10 @@ class Process:
                 if (doc_id, query) in candidates_scores:
                     single_tfidf_list[i] = candidates_scores[(doc_id, query)]
                 i += 1
-            try:
-                pr_score = self.page_rank_dict[doc_id]
-                cosine_score = np.dot(single_tfidf_list, Q) / (index.tfidf_dict[doc_id] * np.linalg.norm(Q))
-                cosine_dict[doc_id] = 2 * (cosine_score * pr_score) / (cosine_score + pr_score)
-            except:
-                cosine_dict[doc_id] = np.dot(single_tfidf_list, Q) / (index.tfidf_dict[doc_id] * np.linalg.norm(Q))
-
+            pr_score = self.page_rank_dict.get(doc_id, 1) * 0.5
+            vw_score = math.log(self.doc_page_views.get(doc_id, 1), 10)
+            cosine_score = np.dot(single_tfidf_list, Q) / (index.tfidf_dict[doc_id] * norm_q)
+            cosine_dict[doc_id] = 2 * (cosine_score * pr_score) / (cosine_score + pr_score) + vw_score * 0.3
         return cosine_dict
 
     def get_top_n(self, sim_dict, N=3):
@@ -224,7 +229,7 @@ class Process:
         results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
         results_title = self.get_topN_score_for_queries(queries_to_search, self.index_title, N)
         results_anchor = self.get_topN_score_for_queries(queries_to_search, self.index_anchor, N)
-        title_body = self.merge_results(results_title, results_body, title_weight=0.5, text_weight=0.5, N=N)
+        title_body = self.merge_results(results_title, results_body, title_weight=0.1, text_weight=0.9, N=N)
         # body_anchor = merge_results(results_body, results_anchor, title_weight=0.5, text_weight=0.5, N=100)
         merged = self.merge_results(title_body, results_anchor, title_weight=0.5, text_weight=0.5, N=N)
         final = [(i[0], self.id_title_dict[i[0]]) for i in merged[0]]
