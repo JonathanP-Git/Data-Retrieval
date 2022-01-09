@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from InvertedIndex import InvertedIndex
+from inverted_index_gcp import InvertedIndex
 from Process import Process
 import json
 
@@ -36,7 +36,7 @@ def search():
     if len(query) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-    res = process.get_topN_score_for_queries({0: query.split(' ')}, process.index, 100)
+    res = process.search({0: query.split(' ')}, 100)
     j = json.dumps(str(res), indent=4)
 
     # END SOLUTION
