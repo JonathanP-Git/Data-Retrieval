@@ -191,7 +191,11 @@ class Process:
 
     def generate_document_tfidf_matrix(self, query_to_search, index, words, pls, Q):
         cosine_dict = {}
+<<<<<<< HEAD
         candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
+=======
+        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words, pls)
+>>>>>>> 6ac99fffc9ae71b754c327fd1b486033c1cfa3ef
         unique_candidates = pd.unique([doc_id for doc_id, freq in candidates_scores.keys()])
         norm_q = (np.linalg.norm(Q))
         queries_amount = len(query_to_search)
@@ -220,12 +224,13 @@ class Process:
             # overall = time()
             query_words, query_pls = zip(*index.posting_lists_iter_query_specified(queries_to_search[query]))
             Q = self.generate_query_tfidf_vector(queries_to_search[query], index, query_words)
-            cosine_dict = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls, Q)
+            cosine_dict = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls,
+                                                              Q)
             fin[query] = self.get_top_n(cosine_dict, N)
             # print(f' OVERALL took: {time() - overall}')
         return fin
 
-    def search(self,queries_to_search,N=3):
+    def search(self, queries_to_search, N=3):
         results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
         results_title = self.get_topN_score_for_queries(queries_to_search, self.index_title, N)
         results_anchor = self.get_topN_score_for_queries(queries_to_search, self.index_anchor, N)
@@ -235,7 +240,19 @@ class Process:
         final = [(i[0], self.id_title_dict[i[0]]) for i in merged[0]]
         return final
 
-    def merge_results(self,title_scores, body_scores, title_weight=0.5, text_weight=0.5, N=3):
+    def search_body(self, queries_to_search, N=3):
+        results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
+        final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
+        return final
+
+    def page_view_2021(self, wiki_ids):
+        final = []
+        for k in wiki_ids:
+            final.append(self.doc_page_views[k])
+        # final = [(i[0], self.id_title_dict[i[0]]) for i in self.doc_page_views]
+        return final
+
+    def merge_results(self, title_scores, body_scores, title_weight=0.5, text_weight=0.5, N=3):
         merged_dict = {}
 
         for query in title_scores:
