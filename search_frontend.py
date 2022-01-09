@@ -35,12 +35,6 @@ def search():
     query = request.args.get('query', '')
     if len(query) == 0:
         return jsonify(res)
-    app.logger.info(query)
-    app.logger.info(type(query))
-
-    app.logger.info(query.split(' '))
-    app.logger.info(type(query.split(' ')))
-
     # BEGIN SOLUTION
     res = process.get_topN_score_for_queries({0: query.split(' ')}, process.index, 100)
     j = json.dumps(str(res), indent=4)
@@ -97,7 +91,7 @@ def search_title():
     if len(query) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-
+    res = process.search_title({0: query.split(' ')}, process.index_title)
     # END SOLUTION
     return jsonify(res)
 
@@ -123,7 +117,8 @@ def get_pagerank():
     if len(wiki_ids) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-
+    for wiki_id in wiki_ids:
+        res.append(process.page_rank[wiki_id])
     # END SOLUTION
     return jsonify(res)
 

@@ -21,10 +21,10 @@ BLOCK_SIZE = 1999998
 class MultiFileWriter:
     """ Sequential binary writer to multiple files of up to BLOCK_SIZE each. """
 
-    def __init__(self, base_dir, name, bucket_name):
+    def __init__(self, base_dir, name, bucket_name,index_name):
         self._base_dir = Path(base_dir)
         self._name = name
-        self._file_gen = (open(self._base_dir / f'{name}_{i:03}.bin', 'wb')
+        self._file_gen = (open(self._base_dir / f'{index_name}/{name}_{i:03}.bin', 'wb')
                           for i in itertools.count())
         self._f = next(self._file_gen)
         # Connecting to google storage bucket.
@@ -197,7 +197,7 @@ class InvertedIndex:
         posting_locs = defaultdict(list)
         bucket_id, list_w_pl = b_w_pl
 
-        with closing(MultiFileWriter(index_name, bucket_id, bucket_name)) as writer:
+        with closing(MultiFileWriter('.', bucket_id, bucket_name,index_name)) as writer:
             for w, pl in list_w_pl:
                 # convert to bytes
                 b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')

@@ -50,10 +50,28 @@ from InvertedIndex import InvertedIndex
 # !pip install -U -q PyDrive
 # !apt-get update -qq
 # !apt install openjdk-8-jdk-headless -qq
-
+import stopwords
 import ast
-NUM_BUCKETS = 124
 RE_WORD = re.compile(r"""[\#\@\w](['\-]?\w){2,24}""", re.UNICODE)
+stopwords_frozen = frozenset(stopwords.words('english'))
+
+def tokenize(text):
+    """
+    This function aims in tokenize a text into a list of tokens. Moreover, it filter stopwords.
+
+    Parameters:
+    -----------
+    text: string , represting the text to tokenize.
+
+    Returns:
+    -----------
+    list of tokens (e.g., list of tokens).
+    """
+    if isinstance(text, list):
+        text = ' '.join(text)
+    list_of_tokens = [token.group() for token in RE_WORD.finditer(text.lower()) if
+                      token.group() not in stopwords_frozen]
+    return list_of_tokens
 
 class Process:
 
@@ -63,15 +81,15 @@ class Process:
         self.index = pickle.load(index_file)
         DL_file = open('./dl.pckl','rb')
         self.index.DL = pickle.load(DL_file)
-        pr_file = open('./page_rank_dict.pckl','rb')
+        pr_file = open('./page_rank_dict.pckl', 'rb')
         self.page_rank = pickle.load(pr_file)
+
+
         DL_file.close()
         index_file.close()
         pr_file.close()
 
-
-
-    def generate_query_tfidf_vector(self, query_to_search, index, words):
+    def generate_query_tfidf_vector(self,query_to_search, index, words):
         epsilon = .0000001
         # total_vocab_size = len(index.term_total)
         Q = np.zeros((len(query_to_search)))
@@ -90,45 +108,32 @@ class Process:
                     pass
         return Q
 
-    def get_candidate_documents_and_scores(self, query_to_search, index, words, pls):
+    def get_candidate_documents_and_scores(self,query_to_search, index, words, pls):
         candidates = {}
-        N = len(self.index.DL)
+        N = len(index.DL)
         for term in np.unique(query_to_search):
             if term in words:
                 list_of_doc = pls[words.index(term)]
-                normlized_tfidf = [(doc_id, (freq / self.index.DL[str(doc_id)]) * math.log(N / index.df[term], 10)) for
-                                   doc_id, freq in list_of_doc]
-
-                for doc_id, tfidf in normlized_tfidf:
-                    candidates[(doc_id, term)] = candidates.get((doc_id, term), 0) + tfidf
+                for doc_id, freq in list_of_doc:
+                    candidates[(doc_id, term)] = candidates.get((doc_id, term), 0) + (
+                                (freq / index.DL[doc_id]) * math.log(N / index.df[term], 10))
 
         return candidates
 
-    def generate_document_tfidf_matrix(self, query_to_search, index, words, pls):
-        # total_vocab_size = len(index.term_total)
-        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,
-                                                                    pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
-        unique_candidates = np.unique([doc_id for doc_id, freq in candidates_scores.keys()])
-        D = np.zeros((len(unique_candidates), len(query_to_search)))
-        D = pd.DataFrame(D)
-
-        D.index = unique_candidates
-        D.columns = query_to_search
-
-        for key in candidates_scores:
-            tfidf = candidates_scores[key]
-            doc_id, term = key
-            D.loc[doc_id][term] = tfidf
-
-        return D
-
-    def cosine_similarity(self, D, Q):
-        d_transpose = np.transpose(D)
-        result = np.dot(Q, d_transpose) / (np.linalg.norm(Q) * (np.linalg.norm(D, axis=1)))
-        fin = {}
-        for i in range(result.shape[0]):
-            fin[D.index[i]] = result[i]
-        return fin
+    def generate_document_tfidf_matrix(self,query_to_search, index, words, pls, Q):
+        cosine_dict = {}
+        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
+        unique_candidates = pd.unique([doc_id for doc_id, freq in candidates_scores.keys()])
+        queries_amount = len(query_to_search)
+        for doc_id in unique_candidates:
+            single_tfidf_list = np.zeros(queries_amount)
+            i = 0
+            for query in query_to_search:
+                if (doc_id, query) in candidates_scores:
+                    single_tfidf_list[i] = candidates_scores[(doc_id, query)]
+                i += 1
+            cosine_dict[doc_id] = np.dot(single_tfidf_list, Q) / (index.tfidf_dict[doc_id] * np.linalg.norm(Q))
+        return cosine_dict
 
     def get_top_n(self,sim_dict, N=3):
         return builtins.sorted([(doc_id, builtins.round(score, 5)) for doc_id, score in sim_dict.items()],
@@ -137,11 +142,10 @@ class Process:
     def get_topN_score_for_queries(self,queries_to_search, index, N=3):
         fin = {}
         for query in queries_to_search.keys():
+            queries_to_search[query] = tokenize(queries_to_search[query])
             query_words, query_pls = zip(*index.posting_lists_iter_query_specified(queries_to_search[query]))
-            matrix = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls)
-            vector = self.generate_query_tfidf_vector(queries_to_search[query], index,query_words)
-            cosine_dict = self.cosine_similarity(matrix, vector)
+            Q = self.generate_query_tfidf_vector(queries_to_search[query], index, query_words)
+            cosine_dict = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls, Q)
             fin[query] = self.get_top_n(cosine_dict, N)
         return fin
-
 
