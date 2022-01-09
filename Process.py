@@ -89,6 +89,66 @@ class Process:
         index_file.close()
         pr_file.close()
 
+        bucket_name = '313371858'
+        client = storage.Client()
+        blobs = client.list_blobs(bucket_name)
+        for b in blobs:
+            if b.name == 'postings_gcp/index.pkl':
+                with b.open("rb") as f:
+                    self.index_body = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'index_title.pkl':
+                with b.open("rb") as f:
+                    self.index_title = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'postings_gcp/index_anchor.pkl':
+                with b.open("rb") as f:
+                    self.index_anchor = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'DL.pkl':
+                with b.open("rb") as f:
+                    dl_body = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'dl_title.pickle':
+                with b.open("rb") as f:
+                    dl_title = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'dl_anchor.pickle':
+                with b.open("rb") as f:
+                    dl_anchor = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'tfidf_dict.pkl':
+                with b.open("rb") as f:
+                    tfidf_dict_body = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'tfidf_title_dict.pickle':
+                with b.open("rb") as f:
+                    tfidf_title_dict = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'tfidf_anchor_dict.pickle':
+                with b.open("rb") as f:
+                    tfidf_anchor_dict = pickle.load(f)
+
+        for b in blobs:
+            if b.name == 'page_rank_dict.pckl':
+                with b.open("rb") as f:
+                    self.page_rank_dict = pickle.load(f)
+
+        self.index_body.DL = dl_body
+        self.index_title.DL = dl_title
+        self.index_anchor.DL = dl_anchor
+        self.index_body.tfidf_dict = tfidf_dict_body
+        self.index_title.tfidf_dict = tfidf_title_dict
+        self.index_anchor.tfidf_dict = tfidf_anchor_dict
+
     def generate_query_tfidf_vector(self,query_to_search, index, words):
         epsilon = .0000001
         # total_vocab_size = len(index.term_total)
