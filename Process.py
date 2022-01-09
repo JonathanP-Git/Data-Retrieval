@@ -144,6 +144,12 @@ class Process:
                 with b.open("rb") as f:
                     self.id_title_dict = pickle.load(f)
 
+        blobs = client.list_blobs(bucket_name)
+        for b in blobs:
+            if b.name == 'doc_page_views.pkl':
+                with b.open("rb") as f:
+                    self.doc_page_views_dict = pickle.load(f)
+
         self.index_body.DL = dl_body
         self.index_title.DL = dl_title
         self.index_anchor.DL = dl_anchor
@@ -184,7 +190,7 @@ class Process:
 
     def generate_document_tfidf_matrix(self, query_to_search, index, words, pls, Q):
         cosine_dict = {}
-        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,pls)
+        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words, pls)
         unique_candidates = pd.unique([doc_id for doc_id, freq in candidates_scores.keys()])
         queries_amount = len(query_to_search)
         for doc_id in unique_candidates:
@@ -215,12 +221,13 @@ class Process:
             # overall = time()
             query_words, query_pls = zip(*index.posting_lists_iter_query_specified(queries_to_search[query]))
             Q = self.generate_query_tfidf_vector(queries_to_search[query], index, query_words)
-            cosine_dict = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls, Q)
+            cosine_dict = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls,
+                                                              Q)
             fin[query] = self.get_top_n(cosine_dict, N)
             # print(f' OVERALL took: {time() - overall}')
         return fin
 
-    def search(self,queries_to_search,N=3):
+    def search(self, queries_to_search, N=3):
         results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
         results_title = self.get_topN_score_for_queries(queries_to_search, self.index_title, N)
         results_anchor = self.get_topN_score_for_queries(queries_to_search, self.index_anchor, N)
@@ -230,7 +237,17 @@ class Process:
         final = [(i[0], self.id_title_dict[i[0]]) for i in merged[0]]
         return final
 
-    def merge_results(self,title_scores, body_scores, title_weight=0.5, text_weight=0.5, N=3):
+    def search_body(self, queries_to_search, N=3):
+        results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
+        final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
+        return final
+
+    # def page_view(self, queries_to_search, N=3):
+    #     results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
+    #     final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
+    #     return final
+
+    def merge_results(self, title_scores, body_scores, title_weight=0.5, text_weight=0.5, N=3):
         merged_dict = {}
 
         for query in title_scores:

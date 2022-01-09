@@ -38,7 +38,6 @@ def search():
     # BEGIN SOLUTION
     res = process.search({0: query.split(' ')}, 100)
     j = json.dumps(str(res), indent=4)
-
     # END SOLUTION
     return jsonify(j)
 
@@ -64,7 +63,7 @@ def search_body():
     if len(query) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-
+    res = process.search_body({0: query.split(' ')}, 100)
     # END SOLUTION
     return jsonify(res)
 
