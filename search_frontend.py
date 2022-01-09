@@ -145,7 +145,7 @@ def get_pageview():
     if len(wiki_ids) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-    res = process.page_view_2021()
+    res = process.page_view_2021(wiki_ids)
     # END SOLUTION
     return jsonify(res)
 

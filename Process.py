@@ -242,8 +242,10 @@ class Process:
         final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
         return final
 
-    def page_view_2021(self):
-        final = self.doc_page_views.values()
+    def page_view_2021(self, wiki_ids):
+        final = []
+        for k in wiki_ids:
+            final.append(self.doc_page_views[k])
         # final = [(i[0], self.id_title_dict[i[0]]) for i in self.doc_page_views]
         return final
 
