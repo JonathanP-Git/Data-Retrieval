@@ -148,7 +148,7 @@ class Process:
         for b in blobs:
             if b.name == 'doc_page_views.pkl':
                 with b.open("rb") as f:
-                    self.doc_page_views_dict = pickle.load(f)
+                    self.doc_page_views = pickle.load(f)
 
         self.index_body.DL = dl_body
         self.index_title.DL = dl_title
@@ -242,10 +242,10 @@ class Process:
         final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
         return final
 
-    # def page_view(self, queries_to_search, N=3):
-    #     results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
-    #     final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
-    #     return final
+    def page_view_2021(self):
+        final = self.doc_page_views.values()
+        # final = [(i[0], self.id_title_dict[i[0]]) for i in self.doc_page_views]
+        return final
 
     def merge_results(self, title_scores, body_scores, title_weight=0.5, text_weight=0.5, N=3):
         merged_dict = {}
