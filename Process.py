@@ -158,6 +158,25 @@ class Process:
         self.index_anchor.tfidf_dict = tfidf_anchor_dict
 
     def generate_query_tfidf_vector(self, query_to_search, index, words):
+        """
+            Generate a vector representing the query. Each entry within this vector represents a tfidf score.
+            The terms representing the query will be the unique terms in the index.
+
+            We will use tfidf on the query as well.
+            For calculation of IDF, use log with base 10.
+            tf will be normalized based on the length of the query.
+
+            Parameters:
+            -----------
+            query_to_search: list of tokens (str). This list will be preprocessed in advance (e.g., lower case, filtering stopwords, etc.').
+                             Example: 'Hello, I love information retrival' --->  ['hello','love','information','retrieval']
+
+            index:           inverted index loaded from the corresponding files.
+
+            Returns:
+            -----------
+            vectorized query with tfidf scores
+            """
         epsilon = .0000001
         # total_vocab_size = len(index.term_total)
         Q = np.zeros((len(query_to_search)))
@@ -177,6 +196,27 @@ class Process:
         return Q
 
     def get_candidate_documents_and_scores(self, query_to_search, index, words, pls):
+        """
+            Generate a dictionary representing a pool of candidate documents for a given query. This function will go through every token in query_to_search
+            and fetch the corresponding information (e.g., term frequency, document frequency, etc.') needed to calculate TF-IDF from the posting list.
+            Then it will populate the dictionary 'candidates.'
+            For calculation of IDF, use log with base 10.
+            tf will be normalized based on the length of the document.
+
+            Parameters:
+            -----------
+            query_to_search: list of tokens (str). This list will be preprocessed in advance (e.g., lower case, filtering stopwords, etc.').
+                             Example: 'Hello, I love information retrival' --->  ['hello','love','information','retrieval']
+
+            index:           inverted index loaded from the corresponding files.
+
+            words,pls: generator for working with posting.
+            Returns:
+            -----------
+            dictionary of candidates. In the following format:
+                                                                       key: pair (doc_id,term)
+                                                                       value: tfidf score.
+            """
         candidates = {}
         N = len(index.DL)
         for term in np.unique(query_to_search):
@@ -189,13 +229,10 @@ class Process:
 
         return candidates
 
-    def generate_document_tfidf_matrix(self, query_to_search, index, words, pls, Q):
+    def generate_document_vector_and_similarity(self, query_to_search, index, words, pls, Q):
+        #Calculate the cosine similarity (and more) for each candidate document.
         cosine_dict = {}
-<<<<<<< HEAD
-        candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words,pls)  # We do not need to utilize all document. Only the docuemnts which have corrspoinding terms with the query.
-=======
         candidates_scores = self.get_candidate_documents_and_scores(query_to_search, index, words, pls)
->>>>>>> 6ac99fffc9ae71b754c327fd1b486033c1cfa3ef
         unique_candidates = pd.unique([doc_id for doc_id, freq in candidates_scores.keys()])
         norm_q = (np.linalg.norm(Q))
         queries_amount = len(query_to_search)
@@ -207,9 +244,10 @@ class Process:
                     single_tfidf_list[i] = candidates_scores[(doc_id, query)]
                 i += 1
             pr_score = self.page_rank_dict.get(doc_id, 1) * 0.5
-            vw_score = math.log(self.doc_page_views.get(doc_id, 1), 10)
+            pv_score = math.log(self.doc_page_views.get(doc_id, 1), 10)
             cosine_score = np.dot(single_tfidf_list, Q) / (index.tfidf_dict[doc_id] * norm_q)
-            cosine_dict[doc_id] = 2 * (cosine_score * pr_score) / (cosine_score + pr_score) + vw_score * 0.3
+            cosine_dict[doc_id] = 2 * cosine_score + 2 * (cosine_score * pr_score) / (
+                        cosine_score + pr_score) + pv_score * 0.3
         return cosine_dict
 
     def get_top_n(self, sim_dict, N=3):
@@ -220,14 +258,10 @@ class Process:
         fin = {}
         for query in queries_to_search.keys():
             queries_to_search[query] = tokenize(queries_to_search[query])
-            # clock = time()
-            # overall = time()
             query_words, query_pls = zip(*index.posting_lists_iter_query_specified(queries_to_search[query]))
             Q = self.generate_query_tfidf_vector(queries_to_search[query], index, query_words)
-            cosine_dict = self.generate_document_tfidf_matrix(queries_to_search[query], index, query_words, query_pls,
-                                                              Q)
+            cosine_dict = self.generate_document_vector_and_similarity(queries_to_search[query], index, query_words, query_pls,                                                      Q)
             fin[query] = self.get_top_n(cosine_dict, N)
-            # print(f' OVERALL took: {time() - overall}')
         return fin
 
     def search(self, queries_to_search, N=3):
@@ -235,26 +269,61 @@ class Process:
         results_title = self.get_topN_score_for_queries(queries_to_search, self.index_title, N)
         results_anchor = self.get_topN_score_for_queries(queries_to_search, self.index_anchor, N)
         title_body = self.merge_results(results_title, results_body, title_weight=0.1, text_weight=0.9, N=N)
-        # body_anchor = merge_results(results_body, results_anchor, title_weight=0.5, text_weight=0.5, N=100)
-        merged = self.merge_results(title_body, results_anchor, title_weight=0.5, text_weight=0.5, N=N)
-        final = [(i[0], self.id_title_dict[i[0]]) for i in merged[0]]
+        merged = self.merge_results(title_body, results_anchor, title_weight=0.9, text_weight=0.1, N=N)
+        final = [(int(i[0]), self.id_title_dict[i[0]]) for i in merged[0]]
         return final
 
     def search_body(self, queries_to_search, N=3):
         results_body = self.get_topN_score_for_queries(queries_to_search, self.index_body, N)
-        final = [(i[0], self.id_title_dict[i[0]]) for i in results_body[0]]
+        final = [(int(i[0]), self.id_title_dict[i[0]]) for i in results_body[0]]
         return final
 
-    def page_view_2021(self, wiki_ids):
+    def search_include(self, queries_to_search,index):
+        for query in queries_to_search.keys():
+            queries_to_search[query] = tokenize(queries_to_search[query])
+            query_words, query_pls = zip(*index.posting_lists_iter_query_specified(queries_to_search[query]))
+            docs_list = self.get_candidate_documents_sorted(queries_to_search[query],index,query_words,query_pls)
+            final = [(int(i[0]), self.id_title_dict.get(i[0],'Random')) for i in docs_list]
+        return final
+
+
+    def getPageView(self, wiki_ids):
         final = []
         for k in wiki_ids:
             final.append(self.doc_page_views[k])
-        # final = [(i[0], self.id_title_dict[i[0]]) for i in self.doc_page_views]
+        return final
+
+    def getPageRank(self, wiki_ids):
+        final = []
+        for wiki_id in wiki_ids:
+            final.append(self.page_rank_dict[wiki_id])
         return final
 
     def merge_results(self, title_scores, body_scores, title_weight=0.5, text_weight=0.5, N=3):
-        merged_dict = {}
+        """
+            This function merge and sort documents retrieved by its weighte score (e.g., title and body).
 
+            Parameters:
+            -----------
+            title_scores: a dictionary build upon the title index of queries and tuples representing scores as follows:
+                                                                                    key: query_id
+                                                                                    value: list of pairs in the following format:(doc_id,score)
+
+            body_scores: a dictionary build upon the body/text index of queries and tuples representing scores as follows:
+                                                                                    key: query_id
+                                                                                    value: list of pairs in the following format:(doc_id,score)
+            title_weight: float, for weigted average utilizing title and body scores
+            text_weight: float, for weigted average utilizing title and body scores
+            N: Integer. How many document to retrieve. This argument is passed to topN function. By default N = 3, for the topN function.
+
+            Returns:
+            -----------
+            dictionary of querires and topN pairs as follows:
+                                                                key: query_id
+                                                                value: list of pairs in the following format:(doc_id,score).
+            """
+
+        merged_dict = {}
         for query in title_scores:
             merged_list = []
             title_list = title_scores[query]
@@ -300,3 +369,13 @@ class Process:
                 merged_dict[query] = body_list[0:N]
 
         return merged_dict
+
+
+    def get_candidate_documents_sorted(self, query_to_search, index, words, pls):
+        candidates = {}
+        for term in np.unique(query_to_search):
+            if term in words:
+                current_list = (pls[words.index(term)])
+                for item in current_list:
+                    candidates[item[0]] = candidates.get(item[0],0) + item[1]
+        return sorted(candidates.items(),key = lambda x: x[1],reverse = True)

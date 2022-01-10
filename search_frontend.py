@@ -37,9 +37,8 @@ def search():
         return jsonify(res)
     # BEGIN SOLUTION
     res = process.search({0: query.split(' ')}, 100)
-    j = json.dumps(str(res), indent=4)
     # END SOLUTION
-    return jsonify(j)
+    return jsonify(res)
 
 
 @app.route("/search_body")
@@ -90,7 +89,7 @@ def search_title():
     if len(query) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-    res = process.search_title({0: query.split(' ')}, process.index_title)
+    res = process.search_include({0: query.split(' ')}, process.index_title)
     # END SOLUTION
     return jsonify(res)
 
@@ -116,8 +115,8 @@ def get_pagerank():
     if len(wiki_ids) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-    for wiki_id in wiki_ids:
-        res.append(process.page_rank[wiki_id])
+    res = process.getPageRank(wiki_ids)
+
     # END SOLUTION
     return jsonify(res)
 
@@ -131,7 +130,7 @@ def get_pageview():
           http://YOUR_SERVER_DOMAIN/get_pageview
         with a json payload of the list of article ids. In python do:
           import requests
-          requests.post('http://YOUR_SERVER_DOMAIN/get_pageview', json=[1,5,8])
+          requests.post('35.232.90.174:8080/get_pageview', json=[1,5,8])
         As before YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
         if you're using ngrok on Colab or your external IP on GCP.
     Returns:
@@ -145,11 +144,39 @@ def get_pageview():
     if len(wiki_ids) == 0:
         return jsonify(res)
     # BEGIN SOLUTION
-    res = process.page_view_2021(wiki_ids)
+    res = process.getPageView(wiki_ids)
+    # END SOLUTION
+    return jsonify(res)
+
+
+@app.route("/search_anchor")
+def search_anchor():
+    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
+        IN THE ANCHOR TEXT of articles, ordered in descending order of the
+        NUMBER OF QUERY WORDS that appear in anchor text linking to the page.
+        For example, a document with a anchor text that matches two of the
+        query words will be ranked before a document with anchor text that
+        matches only one query term.
+
+        Test this by navigating to the a URL like:
+         http://YOUR_SERVER_DOMAIN/search_anchor?query=hello+world
+        where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
+        if you're using ngrok on Colab or your external IP on GCP.
+    Returns:
+    --------
+        list of ALL (not just top 100) search results, ordered from best to
+        worst where each element is a tuple (wiki_id, title).
+    '''
+    res = []
+    query = request.args.get('query', '')
+    if len(query) == 0:
+        return jsonify(res)
+    # BEGIN SOLUTION
+    res = process.search_include({0: query.split(' ')}, process.index_anchor)
     # END SOLUTION
     return jsonify(res)
 
 
 if __name__ == '__main__':
     process = Process()
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=False)

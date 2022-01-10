@@ -1,4 +1,3 @@
-import pyspark
 import sys
 from collections import Counter, OrderedDict
 import itertools
@@ -56,7 +55,6 @@ class MultiFileWriter:
             The function saves the posting files into the right bucket in google storage.
         '''
         file_name = self._f.name
-        print('file_uploaded')
         blob = self.bucket.blob(f"postings_gcp/{file_name}")
         blob.upload_from_filename(file_name)
 
@@ -73,9 +71,7 @@ class MultiFileReader:
         b = []
         for f_name, offset in locs:
             if f_name not in self._open_files:
-                print(f_name)
                 blob = self.bucket.get_blob(f'postings_gcp/{f_name}')
-                print(f'postings_gcp/{f_name}')
                 self._open_files[f_name] = blob.open('rb')
             f = self._open_files[f_name]
             f.seek(offset)
